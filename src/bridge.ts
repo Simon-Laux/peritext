@@ -220,6 +220,7 @@ export function createEditor(args: {
 }): Editor {
     const { actorId, editorNode, changesNode, doc, publisher, handleClickOn, onRemotePatchApplied, editable } = args
     const queue = new ChangeQueue({
+        interval: 1000, // the short intervall was too annoying
         handleFlush: (changes: Array<Change>) => {
             publisher.publish(actorId, changes)
         },
