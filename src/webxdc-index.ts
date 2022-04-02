@@ -7,7 +7,7 @@ import Micromerge from "./micromerge"
 
 import type { Webxdc, ReceivedStatusUpdate } from "../webxdc"
 
-const publisher = new Publisher<Array<Change>>()
+const publisher = new Publisher<Change[]>()
 
 let editor: Editor | undefined
 
@@ -43,37 +43,20 @@ console.log(JSON.stringify(initialChange))
 //aliceDoc.applyChange(initialChange)
 aliceDoc.applyChange(JSON.parse(JSON.stringify(initialChange)))
 
-function update(fastForward: boolean, update: ReceivedStatusUpdate<stateUpdate>) {
-    for (const change of update.payload) {
-        // local actor should be ignored when not fast forwarding,
-        // because micromerge already has that state update and does not accept it a second time
-        if (fastForward || change.actor !== local_actor_id) {
-            console.info("apply", change)
+// TODO
+// - [ ] load from stateupdates
+// - [ ] syncing between peers (kinda works sometimes, until this error appears: Uncaught RangeError: Expected sequence number 7, got 1 applyChange micromerge.ts:503)
 
-            aliceDoc.applyChange(change)
-        }
-    }
-}
-
-let started = false
 webxdc.setUpdateListener(state_update => {
-    if (started) {
-        update(false, state_update)
-    } else {
-        update(true, state_update)
-        if (state_update.serial == state_update.max_serial) {
-            started = true
-        }
-    }
+    //state_update.payload.filter(({ actor }) => actor === local_actor_id).forEach(aliceDoc.applyChange.bind(aliceDoc))
+    publisher.publish("webxdc", state_update.payload)
 }, 0)
 
 publisher.subscribe("webxdc", changes => {
-    // TODO solve that this is somehow called in a loop
     console.log("publishing", { changes })
     if (changes.length == 0) {
         console.log("no change to publish")
     } else {
-        started = true
         webxdc.sendUpdate({ payload: changes }, "update state of document")
     }
 })
@@ -99,6 +82,11 @@ if (aliceNode && aliceEditor && aliceChanges && aliceMarks) {
             const marksAtPosition = view.state.doc.resolve(pos).marks()
             renderMarks(aliceMarks, marksAtPosition)
             return false
+        },
+        onRemotePatchApplied: t => {
+            console.log({ t })
+
+            return t.transaction
         },
     })
 } else {
