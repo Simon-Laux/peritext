@@ -5,7 +5,7 @@ import type { Editor } from "./bridge"
 import { Mark } from "prosemirror-model"
 import Micromerge from "./micromerge"
 
-import type { WEBxDC, RecievedStateUpdate } from "../webxdc"
+import type { Webxdc, ReceivedStatusUpdate } from "../webxdc"
 
 const publisher = new Publisher<Array<Change>>()
 
@@ -19,9 +19,9 @@ const renderMarks = (domNode: Element, marks: Mark[]): void => {
 
 type stateUpdate = Change[]
 
-const webxdc = window.webxdc as WEBxDC<stateUpdate>
+const webxdc = window.webxdc as Webxdc<stateUpdate>
 
-const local_actor_id = webxdc.selfAddr()
+const local_actor_id = webxdc.selfAddr
 
 const aliceDoc = new Micromerge(local_actor_id)
 
@@ -43,18 +43,29 @@ console.log(JSON.stringify(initialChange))
 //aliceDoc.applyChange(initialChange)
 aliceDoc.applyChange(JSON.parse(JSON.stringify(initialChange)))
 
-function update(fastForward: boolean, update: RecievedStateUpdate<stateUpdate>) {
+function update(fastForward: boolean, update: ReceivedStatusUpdate<stateUpdate>) {
     for (const change of update.payload) {
         // local actor should be ignored when not fast forwarding,
         // because micromerge already has that state update and does not accept it a second time
         if (fastForward || change.actor !== local_actor_id) {
+            console.info("apply", change)
+
             aliceDoc.applyChange(change)
         }
     }
 }
 
-webxdc.getAllUpdates().forEach(update.bind(null, true))
-webxdc.setUpdateListener(update.bind(null, false))
+let started = false
+webxdc.setUpdateListener(state_update => {
+    if (started) {
+        update(false, state_update)
+    } else {
+        update(true, state_update)
+        if (state_update.serial == state_update.max_serial) {
+            started = true
+        }
+    }
+}, 0)
 
 publisher.subscribe("webxdc", changes => {
     // TODO solve that this is somehow called in a loop
@@ -62,6 +73,7 @@ publisher.subscribe("webxdc", changes => {
     if (changes.length == 0) {
         console.log("no change to publish")
     } else {
+        started = true
         webxdc.sendUpdate({ payload: changes }, "update state of document")
     }
 })
