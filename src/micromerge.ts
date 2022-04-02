@@ -14,9 +14,9 @@ import {
     getTextWithFormatting,
 } from "./peritext"
 
-const CHILDREN = Symbol("children")
-const ROOT = Symbol("_root")
-const HEAD = Symbol("_head")
+const CHILDREN = "children"
+const ROOT = "_root"
+const HEAD = "_head"
 
 /** A patch represents a change to make to a JSON document.
  *  These are a way for Micromerge to notify a listener of incremental changes
